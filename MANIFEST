@@ -1,0 +1,9 @@
+Changes
+MANIFEST
+Makefile.PL
+Build.PL
+README
+lib/XML/MinWriter.pm
+t/0010_test.t
+META.yml
+META.json
