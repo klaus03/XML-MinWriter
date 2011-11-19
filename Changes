@@ -2,3 +2,8 @@ Revision history for XML-MinWriter
 
 0.01    16 Oct 2010
         First version, released on an unsuspecting world.
+
+0.02    19 Nov 2011
+        Make XML::MinWriter do the same thing as XML::Writer, that is
+        writing character data on a single line together with the opening
+        and closing tags

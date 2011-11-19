@@ -13,16 +13,17 @@ our @EXPORT_OK = qw();
 
 our @EXPORT = qw();
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 sub new {
     shift;
     my $self = {};
     bless $self;
 
-    my %hash = (OUTPUT => \*STDOUT, DATA_MODE => 0, DATA_INDENT => 0, NEWLINES => 0, APOS => 0, @_);
+    my %hash = (OUTPUT => \*STDOUT, LINE_MODE => 0, DATA_MODE => 0, DATA_INDENT => 0, NEWLINES => 0, APOS => 0, @_);
 
     $self->{OUTPUT}      = $hash{OUTPUT};
+    $self->{LINE_MODE}   = $hash{LINE_MODE};
     $self->{DATA_MODE}   = $hash{DATA_MODE};
     $self->{DATA_INDENT} = $hash{DATA_INDENT};
     $self->{NEWLINES}    = $hash{NEWLINES};
@@ -31,8 +32,9 @@ sub new {
     $self->{PYX_TYPE}    = '';
     $self->{PYX_TAG}     = '';
     $self->{PYX_ATTR}    = [];
+    $self->{PRV_OC}      = '';
 
-    if ($self->{DATA_MODE}) {
+    if ($self->{LINE_MODE}) {
         $self->{NEWLINES} = 0;
     }
 
@@ -109,7 +111,7 @@ sub endTag {
 
     $self->flush_pyx;
 
-    $self->emitEnd(@_);
+    $self->emitLine('</', '>', 'D', @_);
 }
 
 sub characters {
@@ -129,7 +131,7 @@ sub dataElement {
 
     $self->emitLine('<', '>', 'D', $name, @_);
     $self->emitChars($data);
-    $self->emitEnd($name);
+    $self->emitLine('</', '>', 'D', $name);
 }
 
 sub write_pyx {
@@ -157,7 +159,7 @@ sub write_pyx {
     }
     elsif ($code eq ')') {
         $self->flush_pyx;
-        $self->emitEnd($text);
+        $self->emitLine('</', '>', 'D', $text);
     }
     elsif ($code eq '-') {
         $self->flush_pyx;
@@ -213,7 +215,7 @@ sub emitDoc {
     my $self = shift;
     my ($name, $publicId, $systemId) = @_;
 
-    $self->ws_before;
+    $self->ws_before('<!', '>');
 
     repl_quot($name);
     print {$self->{OUTPUT}} qq{<!DOCTYPE $name};
@@ -233,30 +235,19 @@ sub emitDoc {
     print {$self->{OUTPUT}} qq{\n} if $self->{NEWLINES};
     print {$self->{OUTPUT}} qq{>};
 
-    $self->ws_after;
-
-    if ($self->{LEVEL} == 0
-    and !$self->{DATA_MODE}
-    and !$self->{NEWLINES}) {
-        print {$self->{OUTPUT}} qq{\n};
-    }
+    $self->ws_after('<!', '>');
 }
 
 sub emitComment {
     my $self = shift;
     my ($data) = @_;
 
-    $self->ws_before;
-
-    if ($self->{DATA_MODE}) {
-        $data =~ s{\s+}' 'xmsg;
-        $data =~ s{\A \s}''xms;
-        $data =~ s{\s \z}''xms;
-    }
+    $self->ws_before('<!--', '-->');
 
     $data =~ s{-->}'==>'xmsg;
     print {$self->{OUTPUT}} qq{<!-- $data -->};
-    $self->ws_after;
+
+    $self->ws_after('<!--', '-->');
 }
 
 sub emitLine {
@@ -264,7 +255,14 @@ sub emitLine {
     my ($open, $close, $mode) = (shift, shift, shift);
     my $name = shift;
 
-    $self->ws_before;
+    if ($open eq '</' and $close eq '>') {
+        $self->{LEVEL}--;
+        if ($self->{LEVEL} < 0) {
+            croak "Level underflow for end-tag </$name>";
+        }
+    }
+
+    $self->ws_before($open, $close);
 
     repl_quot($name);
     print {$self->{OUTPUT}} $open, $name;
@@ -290,40 +288,10 @@ sub emitLine {
     print {$self->{OUTPUT}} qq{ }  if !$self->{NEWLINES} and $close eq '/>';
     print {$self->{OUTPUT}} $close;
 
-    $self->ws_after;
-
-    if ($self->{LEVEL} == 0
-    and !$self->{DATA_MODE}
-    and !$self->{NEWLINES}
-    and $close eq '?>') {
-        print {$self->{OUTPUT}} qq{\n};
-    }
+    $self->ws_after($open, $close);
 
     if ($open eq '<' and $close eq '>') {
         $self->{LEVEL}++;
-    }
-}
-
-sub emitEnd {
-    my $self = shift;
-    my $name = shift;
-
-    repl_quot($name);
-
-    $self->{LEVEL}--;
-    if ($self->{LEVEL} < 0) {
-        croak "Level underflow for end-tag </$name>";
-    }
-
-    $self->ws_before;
-    print {$self->{OUTPUT}} qq{</$name};
-    print {$self->{OUTPUT}} qq{\n} if $self->{NEWLINES};
-    print {$self->{OUTPUT}} qq{>};
-    $self->ws_after;
-
-    if ($self->{LEVEL} == 0
-    and !$self->{DATA_MODE}) {
-        print {$self->{OUTPUT}} qq{\n};
     }
 }
 
@@ -333,32 +301,55 @@ sub emitChars {
 
     repl_nrm($text);
 
-    if ($self->{DATA_MODE}) {
-        $text =~ s{\s+}' 'xmsg;
-        $text =~ s{\A \s}''xms;
-        $text =~ s{\s \z}''xms;
-    }
-
-    if ($text ne '' and $self->{LEVEL} > 0) {
-        $self->ws_before;
+    if ($self->{LEVEL} > 0) {
+        $self->ws_before('<T', 'T>');
         print {$self->{OUTPUT}} $text;
-        $self->ws_after;
+        $self->ws_after('<T', 'T>');
     }
 }
 
 sub ws_before {
     my $self = shift;
+    my ($open, $close) = (shift, shift);
+
+    my $curr_oc = $open.'*'.$close;
 
     if ($self->{DATA_MODE}) {
+        if ((($curr_oc eq '<*>' or $curr_oc eq '<*/>' or $curr_oc eq '<!--*-->') and $self->{LEVEL} > 0)
+        or  ($curr_oc eq '</*>' and ($self->{PRV_OC} eq '</*>' or $self->{PRV_OC} eq '<*/>' or $self->{PRV_OC} eq '<!--*-->'))) {
+            print {$self->{OUTPUT}} qq{\n}, qq{ } x ($self->{DATA_INDENT} * $self->{LEVEL});
+        }
+    }
+    elsif ($self->{LINE_MODE}) {
         print {$self->{OUTPUT}} qq{ } x ($self->{DATA_INDENT} * $self->{LEVEL});
     }
+
+    $self->{PRV_OC} = $curr_oc;
 }
 
 sub ws_after {
     my $self = shift;
+    my ($open, $close) = (shift, shift);
+
+    my $curr_oc = $open.'*'.$close;
 
     if ($self->{DATA_MODE}) {
+    }
+    elsif ($self->{LINE_MODE}) {
         print {$self->{OUTPUT}} qq{\n};
+    }
+
+    if ($self->{NEWLINES}) {
+        if ($self->{LEVEL} == 0 and $curr_oc eq '</*>') {
+            print {$self->{OUTPUT}} qq{\n};
+        }
+    }
+    elsif ($self->{LEVEL} == 0 and !$self->{LINE_MODE}) {
+        if ($curr_oc eq '<!*>'
+        or  $curr_oc eq '<?*?>'
+        or  $curr_oc eq '</*>') {
+            print {$self->{OUTPUT}} qq{\n};
+        }
     }
 }
 
@@ -396,7 +387,7 @@ Here is a simple example of how to use XML::MinWriter:
   use XML::MinWriter;
 
   open my $fh, '>', \my $xml or die $!;
-  my $wrt = XML::MinWriter->new(OUTPUT => $fh, DATA_MODE => 1, DATA_INDENT => 2);
+  my $wrt = XML::MinWriter->new(OUTPUT => $fh, LINE_MODE => 1, DATA_INDENT => 2);
 
   $wrt->xmlDecl('iso-8859-1');
   $wrt->startTag('alpha');
@@ -426,6 +417,37 @@ Here is a simple example of how to use XML::MinWriter:
     </gamma>
   </alpha>
 
+Here is the same example, but with DATA_MODE => 1 instead of LINE_MODE => 1
+
+  use XML::MinWriter;
+
+  open my $fh, '>', \my $xml or die $!;
+  my $wrt = XML::MinWriter->new(OUTPUT => $fh, DATA_MODE => 1, DATA_INDENT => 2);
+
+  $wrt->xmlDecl('iso-8859-1');
+  $wrt->startTag('alpha');
+  $wrt->startTag('beta', p1 => 'dat1', p2 => 'dat2');
+  $wrt->characters('abcdefg');
+  $wrt->endTag('beta');
+  $wrt->write_pyx('(gamma');
+  $wrt->write_pyx('-hijklmn');
+  $wrt->write_pyx(')gamma');
+  $wrt->endTag('alpha');
+
+  $wrt->end;
+  close $fh;
+
+  print "The XML generated is as follows:\n\n";
+  print $xml, "\n";
+
+...and this is the output:
+
+  <?xml version="1.0" encoding="iso-8859-1"?>
+  <alpha>
+    <beta p1="dat1" p2="dat2">abcdefg</beta>
+    <gamma>hijklmn</gamma>
+  </alpha>
+
 =head1 DESCRIPTION
 
 XML::MinWriter is a module to write XML. It is largely compatible to XML::Writer, but XML::MinWriter
@@ -437,7 +459,7 @@ then be fed into XML::MinWriter to generate XML).
 
 To create an XML::MinWriter object, the following syntax is used:
 
-  my $wrt = XML::MinWriter->new(OUTPUT => $fh, DATA_MODE => 1, DATA_INDENT => 2);
+  my $wrt = XML::MinWriter->new(OUTPUT => $fh, LINE_MODE => 1, DATA_INDENT => 2);
 
 One or more of the following options can be used (those options are largely compatible
 with XML::Writer):
@@ -448,10 +470,16 @@ with XML::Writer):
 
 Option OUTPUT => $fh determines that the XML is written to filehandle $fh, the default is OUTPUT => \*STDOUT.
 
+=item option LINE_MODE =>
+
+The option LINE_MODE => 0|1 is a true or false value; if this parameter is present and its value is true (1), then
+XML::MinWriter will enter a special line mode, inserting newlines automatically around elements. The default is
+LINE_MODE => 0.
+
 =item option DATA_MODE =>
 
 The option DATA_MODE => 0|1 is a true or false value; if this parameter is present and its value is true (1), then
-XML::MinWriter will enter a special data mode, inserting newlines automatically around elements. The default is
+XML::MinWriter will enter a special Data mode, to be compatible with XML::Writer. The default is
 DATA_MODE => 0.
 
 =item option DATA_INDENT =>
@@ -659,7 +687,7 @@ For example the following PYX code:
   use XML::MinWriter;
 
   open my $fh, '>', \my $xml or die $!;
-  my $wrt = XML::MinWriter->new(OUTPUT => $fh, DATA_MODE => 1, DATA_INDENT => 2);
+  my $wrt = XML::MinWriter->new(OUTPUT => $fh, LINE_MODE => 1, DATA_INDENT => 2);
 
   $wrt->write_pyx('?xml version="1.0" encoding="iso-8859-1"');
   $wrt->write_pyx('(data');
@@ -733,25 +761,17 @@ A sample code fragment that uses XML::Reader together with XML::MinWriter:
 
   close $fh;
 
-  say $xml;
+  print $xml, "\n";
 
 This is the resulting XML:
 
   <?xml version="1.0" encoding="iso-8859-1"?>
   <!DOCTYPE delta PUBLIC "public" "system">
   <delta>
-    <customer name="aaa">
-      one
-    </customer>
-    <customer name="bbb">
-      two
-    </customer>
-    <customer name="ccc">
-      three
-    </customer>
-    <customer name="ddd">
-      four
-    </customer>
+    <customer name="aaa">one</customer>
+    <customer name="bbb">two</customer>
+    <customer name="ccc">three</customer>
+    <customer name="ddd">four</customer>
   </delta>
 
 =head1 AUTHOR
