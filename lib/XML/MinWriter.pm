@@ -13,7 +13,7 @@ our @EXPORT_OK = qw();
 
 our @EXPORT = qw();
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 sub new {
     shift;
@@ -232,7 +232,7 @@ sub emitDoc {
         print {$self->{OUTPUT}} qq{ SYSTEM }, $self->{DELIM}, $systemId, $self->{DELIM};
     }
 
-    print {$self->{OUTPUT}} qq{\n} if $self->{NEWLINES};
+    #~ print {$self->{OUTPUT}} qq{\n} if $self->{NEWLINES};
     print {$self->{OUTPUT}} qq{>};
 
     $self->ws_after('<!', '>');
@@ -284,8 +284,8 @@ sub emitLine {
         }
     }
 
-    print {$self->{OUTPUT}} qq{\n} if $self->{NEWLINES};
-    print {$self->{OUTPUT}} qq{ }  if !$self->{NEWLINES} and $close eq '/>';
+    print {$self->{OUTPUT}} qq{\n} if $self->{NEWLINES} and $open ne '<?';
+    print {$self->{OUTPUT}} qq{ }  if $close eq '/>';
     print {$self->{OUTPUT}} $close;
 
     $self->ws_after($open, $close);
@@ -315,8 +315,14 @@ sub ws_before {
     my $curr_oc = $open.'*'.$close;
 
     if ($self->{DATA_MODE}) {
-        if ((($curr_oc eq '<*>' or $curr_oc eq '<*/>' or $curr_oc eq '<!--*-->') and $self->{LEVEL} > 0)
-        or  ($curr_oc eq '</*>' and ($self->{PRV_OC} eq '</*>' or $self->{PRV_OC} eq '<*/>' or $self->{PRV_OC} eq '<!--*-->'))) {
+        if ((($curr_oc eq '<*>'
+           or $curr_oc eq '<*/>'
+           or $curr_oc eq '<!--*-->')
+           and $self->{LEVEL} > 0)
+        or ($curr_oc eq '</*>'
+           and ($self->{PRV_OC} eq '</*>'
+           or   $self->{PRV_OC} eq '<*/>'
+           or   $self->{PRV_OC} eq '<!--*-->'))) {
             print {$self->{OUTPUT}} qq{\n}, qq{ } x ($self->{DATA_INDENT} * $self->{LEVEL});
         }
     }
@@ -339,15 +345,11 @@ sub ws_after {
         print {$self->{OUTPUT}} qq{\n};
     }
 
-    if ($self->{NEWLINES}) {
-        if ($self->{LEVEL} == 0 and $curr_oc eq '</*>') {
-            print {$self->{OUTPUT}} qq{\n};
-        }
-    }
-    elsif ($self->{LEVEL} == 0 and !$self->{LINE_MODE}) {
-        if ($curr_oc eq '<!*>'
-        or  $curr_oc eq '<?*?>'
-        or  $curr_oc eq '</*>') {
+    if (!$self->{LINE_MODE}) {
+        if ($self->{LEVEL} == 0
+        and ($curr_oc eq '</*>'
+        or   $curr_oc eq '<?*?>'
+        or   $curr_oc eq '<!*>')) {
             print {$self->{OUTPUT}} qq{\n};
         }
     }

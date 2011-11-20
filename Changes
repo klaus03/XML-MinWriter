@@ -7,3 +7,6 @@ Revision history for XML-MinWriter
         Make XML::MinWriter do the same thing as XML::Writer, that is
         writing character data on a single line together with the opening
         and closing tags
+
+0.03    20 Nov 2011
+        Adapt the output of NEWLINES => 1 to match XML::Writer
