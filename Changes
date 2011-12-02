@@ -10,3 +10,9 @@ Revision history for XML-MinWriter
 
 0.03    20 Nov 2011
         Adapt the output of NEWLINES => 1 to match XML::Writer
+
+0.04    02 Dec 2011
+        Completeley re-think the purpose and design of XML::MinWriter -->
+        XML::MinWriter inherits from XML::Writer and adds one single method
+        write_pyx.
+

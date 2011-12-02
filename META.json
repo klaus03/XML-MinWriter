@@ -18,12 +18,17 @@
          "requires" : {
             "Module::Build" : "0.3"
          }
+      },
+      "runtime" : {
+         "requires" : {
+            "XML::Writer" : 0
+         }
       }
    },
    "provides" : {
       "XML::MinWriter" : {
          "file" : "lib/XML/MinWriter.pm",
-         "version" : "0.03"
+         "version" : "0.04"
       }
    },
    "release_status" : "stable",
@@ -32,5 +37,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "0.03"
+   "version" : "0.04"
 }
