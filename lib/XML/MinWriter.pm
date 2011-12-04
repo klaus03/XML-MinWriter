@@ -14,7 +14,7 @@ our @EXPORT_OK = qw();
 
 our @EXPORT = qw();
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 sub new {
     my $class = shift;
@@ -318,9 +318,6 @@ Klaus Eichner, October 2011
 =head1 COPYRIGHT AND LICENSE
 
 Copyright (C) 2011 by Klaus Eichner
-
-This library is based on XML::Writer. You can redistribute and/or modify XML::Writer under
-the terms as described in the documentation for XML::Writer.
 
 XML::MinWriter is free software; you can redistribute and/or modify XML::MinWriter
 under the same terms as Perl itself.

@@ -16,3 +16,5 @@ Revision history for XML-MinWriter
         XML::MinWriter inherits from XML::Writer and adds one single method
         write_pyx.
 
+0.05    04 Dec 2011
+        re-write license text
