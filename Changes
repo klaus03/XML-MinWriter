@@ -18,3 +18,8 @@ Revision history for XML-MinWriter
 
 0.05    04 Dec 2011
         re-write license text
+
+0.06    04 Aug 2012
+        Change the obvious error in MinWriter.pm:
+        previously: if ($intro =~ m{\A xml}xmsi and $intro !~ m{/\A xml-stylesheet \z/}xmsi) {
+        now       : if ($intro =~ m{\A xml}xmsi and $intro !~ m{\A xml-stylesheet \z}xmsi) {

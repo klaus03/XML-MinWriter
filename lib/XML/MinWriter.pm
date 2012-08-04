@@ -14,7 +14,7 @@ our @EXPORT_OK = qw();
 
 our @EXPORT = qw();
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 sub new {
     my $class = shift;
@@ -83,7 +83,7 @@ sub write_pyx {
                 next LOOP1;
             }
 
-            if ($intro =~ m{\A xml}xmsi and $intro !~ m{/\A xml-stylesheet \z/}xmsi) {
+            if ($intro =~ m{\A xml}xmsi and $intro !~ m{\A xml-stylesheet \z}xmsi) {
                 my ($version, $encoding, $standalone);
                 my $data = $def;
                 while (my ($key, $val, $rest) = $data =~ m{\A (\S+) \s* = \s* ["']([^"']+)["'] \s* (.*) \z}xms) {
