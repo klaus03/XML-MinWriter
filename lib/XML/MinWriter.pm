@@ -14,8 +14,6 @@ our @EXPORT_OK = qw();
 
 our @EXPORT = qw();
 
-our $VERSION = '0.07';
-
 sub new {
     my $class = shift;
     my $self = $class->SUPER::new(@_);
